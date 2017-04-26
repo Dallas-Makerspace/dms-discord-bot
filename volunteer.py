@@ -64,5 +64,8 @@ async def on_message(message):
         else:
             await client.send_message(message.channel, 'You did not have the role')
             log.debug('[%s] Role was already not assigned' % message.author)
+    elif message.content == '!about':
+        log.debug('[%s] Requested information about us' % message.author)
+        await client.send_message(message.channel, "I'm the friendly bot for managing various automatic rules and features of the Dallas Makerspace Discord chat server. My source code is available at: https://github.com/Dallas-Makerspace/dms-discord-bot")
 
 client.run(args.token)
