@@ -129,5 +129,7 @@ async def on_message(message):
               "If I'm not working correctly or you'd like to help improve me, please join the {0} channel.\n\n" \
               "My source code is available at: https://github.com/Dallas-Makerspace/dms-discord-bot.".format(infrastructure.mention)
         await client.send_message(message.channel, msg)
+    elif message.content.startswith("!voluntell"):
+        await client.send_message(message.channel, "{user} do it yourself".format(user=message.author.mention))
 
 client.run(args.token)
