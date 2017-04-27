@@ -2,15 +2,15 @@
 import logging as log
 import discord, asyncio, argparse, sys
 
-parser = argparse.ArgumentParser(description='Handle the #on_hand_volunteers channel.')
-parser.add_argument('-v', '--verbose', dest='verbose', action='store_const',
+parser = argparse.ArgumentParser(description="Handle the #on_hand_volunteers channel.")
+parser.add_argument("-v", "--verbose", dest="verbose", action="store_const",
                     const=True, default=False,
-                    help='verbose output')
-parser.add_argument('-q', '--quiet', dest='quiet', action='store_const',
+                    help="verbose output")
+parser.add_argument("-q", "--quiet", dest="quiet", action="store_const",
                     const=True, default=False,
-                    help='only output warnings and errors')
-parser.add_argument('token', metavar='token', action='store',
-                    help='discord auth token for the bot')
+                    help="only output warnings and errors")
+parser.add_argument("token", metavar="token", action="store",
+                    help="discord auth token for the bot")
 args = parser.parse_args()
 
 if args.verbose:
@@ -28,44 +28,90 @@ client = discord.Client()
 @client.event
 async def on_ready():
     log.info("Connected to discord")
-    log.debug('Logged in as')
-    log.debug(client.user.name)
-    log.debug(client.user.id)
-    log.debug('------')
+    log.debug("Logged in as:")
+    log.debug("User: %s" % client.user.name)
+    log.debug("ID: %s" % client.user.id)
+
+def get_channel(message, requested_channel):
+    for channel in message.server.channels:
+        if channel.name == requested_channel:
+            return(channel)
+    else:
+        log.error("The #%s channel does not exist" % requested_channel)
+        return(false)
+
+def get_role(message, requested_role):
+    for role in message.server.roles:
+        if role.name == requested_role:
+            return(role)
+    else:
+        log.error("The %s role does not exist" % requested_role)
+        return(false)
 
 @client.event
 async def on_message(message):
-    if message.content == '!volunteer':
-        log.debug('[%s] Role addition requested' % message.author)
-        for author_role in message.author.roles:
-            if author_role.name == 'volunteers':
-                await client.send_message(message.channel, 'You already have that role')
-                log.debug('[%s] Role already assigned' % message.author)
-                break;
-        else:
-            for role in message.server.roles:
-                if role.name == 'volunteers':
-                    break
-            else:
-                await client.send_message(message.channel, 'An error has occured, the role does not exist')
-                log.error("The volunteers role does not exist")
+    # Add user to the volunteers role
+    if message.content == "!volunteer":
+        # Grab the info for the #on_hand_volunteers channel
+        on_hand_volunteers = get_channel(message, "on_hand_volunteers")
+        if not on_hand_volunteers:
+            # Channel doesn't exist, something is wrong!
+            await client.send_message(message.channel, "An error has occured, the #on_hand_volunteers channel does not exist. Please tell @nerds something is wrong!")
+            return
 
-            await client.add_roles(message.author, role)
-            await client.send_message(message.channel, 'Role added')
-            log.info('[%s] Role added' % message.author)
-    elif message.content == '!unvolunteer':
-        log.debug('[%s] Role removal requested' % message.author)
+        # Grab the info for the volunteers role
+        volunteers_role = get_role(message, "volunteers")
+        if not volunteers_role:
+            # Role doesn't exist, something is wrong!
+            await client.send_message(message.channel, "An error has occured, the volunteers role does not exist. Please tell @nerds something is wrong!")
+            return
+
+        log.debug("[%s] Role addition requested" % message.author)
+
+        # Check to see if the user already has this role
         for author_role in message.author.roles:
-            if author_role.name == 'volunteers':
-                await client.remove_roles(message.author, author_role)
-                await client.send_message(message.channel, 'Role removed')
-                log.info('[%s] Role removed' % message.author)
-                break;
+            if author_role.name == "volunteers":
+                # They did, let them know they already had it
+                msg = "{user} you already have access to the {channel} channel."
+                await client.send_message(message.channel, msg.format(user=message.author.mention, channel=on_hand_volunteers.mention))
+                log.debug("[%s] Role already assigned" % message.author)
+                break
         else:
-            await client.send_message(message.channel, 'You did not have the role')
-            log.debug('[%s] Role was already not assigned' % message.author)
-    elif message.content == '!about':
-        log.debug('[%s] Requested information about us' % message.author)
-        await client.send_message(message.channel, "I'm the friendly bot for managing various automatic rules and features of the Dallas Makerspace Discord chat server. My source code is available at: https://github.com/Dallas-Makerspace/dms-discord-bot")
+            # They didn't have the role, so add it
+            await client.add_roles(message.author, volunteers_role)
+            msg = "Hello {user}, you are now able to post in the {channel} channel. You can use `!unvolunteer` to be removed from the channel at anytime."
+            await client.send_message(message.channel, msg.format(user=message.author.mention, channel=on_hand_volunteers.mention))
+            log.info("[%s] Role added" % message.author)
+
+    # Remove user from the volunteers role
+    elif message.content == "!unvolunteer":
+        # Grab the info for the volunteers role
+        on_hand_volunteers = get_channel(message, "on_hand_volunteers")
+        if not on_hand_volunteers:
+            await client.send_message(message.channel, "An error has occured, the #on_hand_volunteers channel does not exist. Please tell @nerds something is wrong!")
+            return
+
+        log.debug("[%s] Role removal requested" % message.author)
+
+        # Check to see if the user has this role
+        for author_role in message.author.roles:
+            if author_role.name == "volunteers":
+                # They did, so remove the role
+                await client.remove_roles(message.author, author_role)
+                msg = "Hello {user}, you have been removed from the {channel} channel, to re-join send `!volunteer` in any channel."
+                await client.send_message(message.channel, msg.format(user=message.author.mention, channel=on_hand_volunteers.mention))
+                log.info("[%s] Role removed" % message.author)
+                break
+        else:
+            # They didn't have the role, do nothing
+            msg = "{user}, you have already unsubscribed from the {channel} channel"
+            await client.send_message(message.channel, msg.format(user=message.author.mention, channel=on_hand_volunteers.mention))
+            log.debug("[%s] Role was already not assigned" % message.author)
+
+    # Show a help/about dialog
+    elif message.content in ("!about", "!help"):
+        log.debug("[%s] Requested information about us" % message.author)
+        msg = "I'm the friendly bot for managing various automatic rules and features of the Dallas Makerspace Discord chat server. My source code is available at: https://github.com/Dallas-Makerspace/dms-discord-bot"
+        await client.send_message(message.channel, msg)
 
 client.run(args.token)
