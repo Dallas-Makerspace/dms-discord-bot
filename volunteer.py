@@ -167,7 +167,7 @@ async def on_message(message):
               "`!about` or `!commands` - This about message.\n" \
               "`!help` - Request help from volunteers, for example `!help I can't access the fileserver` will send a request to the active volunteers.\n" \
               "`!volunteer` - Add yourself to the list of active volunteers, gain access to post in the {on_hand_volunteers} channel.\n" \
-              "`!unvoluntter` - Remove yourself from the list of active volunteers once you are done for the day.\n" \
+              "`!unvoluntter` - Remove yourself from the list of active volunteers and stop receiving notifcations.\n" \
               "`!volunteers` - List the active volunteers.\n" \
               "\nIf I'm not working correctly or you'd like to help improve me, please join the {infrastructure} channel.\n\n" \
               "My source code is available at: https://github.com/Dallas-Makerspace/dms-discord-bot." \
