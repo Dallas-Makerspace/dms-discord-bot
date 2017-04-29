@@ -1,6 +1,11 @@
 #!/usr/bin/python3
+import argparse
 import logging as log
-import discord, asyncio, argparse, sys
+import sys
+import discord
+import asyncio
+import urllib.request
+import json
 
 parser = argparse.ArgumentParser(description="Handle the #on_hand_volunteers channel.")
 parser.add_argument("-v", "--verbose", dest="verbose", action="store_const",
@@ -159,6 +164,14 @@ async def on_message(message):
         )
         await client.send_message(channels['on_hand_volunteers'], help_msg)
 
+    # Request number of members
+    elif message.content.startswith("!members"):
+        log.debug("[{0}] Requested number of members".format(message.author))
+        with urllib.request.urlopen("https://accounts.dallasmakerspace.org/member_count.php") as url:
+            data = json.loads(url.read().decode())
+            msg = "There are currently {total} members.".format(total=data['total'])
+            await client.send_message(message.channel, msg)
+
     # Show a help/about dialog
     elif message.content in ("!about", "!commands"):
         log.debug("[{0}] Requested information about us".format(message.author))
@@ -169,6 +182,7 @@ async def on_message(message):
               "`!volunteer` - Add yourself to the list of active volunteers, gain access to post in the {on_hand_volunteers} channel.\n" \
               "`!unvoluntter` - Remove yourself from the list of active volunteers and stop receiving notifcations.\n" \
               "`!volunteers` - List the active volunteers.\n" \
+              "`!members` - Show the total number of active DMS members.\n" \
               "\nIf I'm not working correctly or you'd like to help improve me, please join the {infrastructure} channel.\n\n" \
               "My source code is available at: https://github.com/Dallas-Makerspace/dms-discord-bot." \
               .format(on_hand_volunteers=channels['on_hand_volunteers'].mention, infrastructure=channels['infrastructure'].mention)
