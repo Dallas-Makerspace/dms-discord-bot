@@ -154,13 +154,21 @@ async def on_message(message):
         else:
             request_method = message.channel.mention
 
+        message_parts = message.content.split(' ', 1)
+
+        if len(message_parts) == 1:
+            log.info("[{0}] No message specified in help request".format(message.author))
+            msg = "You must specify a message with your help request"
+            await client.send_message(message.author, msg)
+            return
+
         # Build the message for #on_hand_volunteers
         help_msg = "Eyes up, {volunteers}! {user} in {channel} needs help: {request}".format(
             volunteers=roles['volunteers'].mention,
             user=message.author.mention,
             channel=request_method,
             # Remove "!help " from the message
-            request=message.content.split(' ', 1)[1]
+            request=message_parts[1]
         )
         await client.send_message(channels['on_hand_volunteers'], help_msg)
 
