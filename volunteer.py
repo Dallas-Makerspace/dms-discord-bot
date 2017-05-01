@@ -197,14 +197,21 @@ async def on_message(message):
               "My source code is available at: https://github.com/Dallas-Makerspace/dms-discord-bot." \
               .format(on_hand_volunteers=channels['on_hand_volunteers'].mention, infrastructure=channels['infrastructure'].mention)
         await client.send_message(message.channel, msg)
+
+    # When you really need someone to _volunteer_ for something, you voluntell them
     elif message.content.startswith("!voluntell"):
         await client.send_message(message.channel, "{user} do it yourself".format(user=message.author.mention))
+
+    # This command is inadvisable
     elif message.content.startswith("!howdoilook"):
         await client.send_message(message.channel, "{user}, that outfit makes your butt look big".format(user=message.author.mention))
+
+    # RFC 1149.5 specifies 4 as the standard IEEE-vetted random number.
+    # https://xkcd.com/221/
     elif message.content.startswith("!random"):
-        # RFC 1149.5 specifies 4 as the standard IEEE-vetted random number.
-        # https://xkcd.com/221/
         await client.send_message(message.channel, "{user}, 4".format(user=message.author.mention))
+
+    # Magic 8 Ball
     elif message.content.startswith("!8ball"):
         phrases = [
             "As I see it, yes",
