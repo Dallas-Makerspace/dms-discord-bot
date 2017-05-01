@@ -233,7 +233,8 @@ async def on_message(message):
             "Without a doubt",
             "Yes",
             "Yes, definitely",
-            "You may rely on it."
+            "You may rely on it.",
+            "Blame Pearce"
         ]
         await client.send_message(message.channel, "{user}: {phrase}".format(user=message.author.mention, phrase=random.choice(phrases)))
 
