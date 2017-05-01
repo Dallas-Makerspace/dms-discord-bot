@@ -201,7 +201,7 @@ async def on_message(message):
 
     # When you really need someone to _volunteer_ for something, you voluntell them
     elif message.content.startswith("!voluntell"):
-        await client.send_message(message.channel, "{user} do it yourself".format(user=message.author.mention))
+        await client.send_message(message.channel, "{user} do it yourself. If you need help with something, ask politely using the `!help` command".format(user=message.author.mention))
 
     # This command is inadvisable
     elif message.content.startswith("!howdoilook"):
