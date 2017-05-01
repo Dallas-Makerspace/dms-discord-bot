@@ -201,6 +201,10 @@ async def on_message(message):
         await client.send_message(message.channel, "{user} do it yourself".format(user=message.author.mention))
     elif message.content.startswith("!howdoilook"):
         await client.send_message(message.channel, "{user}, that outfit makes your butt look big".format(user=message.author.mention))
+    elif message.content.startswith("!random"):
+        # RFC 1149.5 specifies 4 as the standard IEEE-vetted random number.
+        # https://xkcd.com/221/
+        await client.send_message(message.channel, "{user}, 4".format(user=message.author.mention))
     elif message.content.startswith("!8ball"):
         phrases = [
             "As I see it, yes",
