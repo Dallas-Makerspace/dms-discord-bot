@@ -6,6 +6,7 @@ import discord
 import asyncio
 import urllib.request
 import json
+import random
 
 parser = argparse.ArgumentParser(description="Handle the #on_hand_volunteers channel.")
 parser.add_argument("-v", "--verbose", dest="verbose", action="store_const",
@@ -81,7 +82,7 @@ async def on_ready():
 @client.event
 async def on_message(message):
     # Add user to the volunteers role
-    if message.content == "!volunteer":
+    if message.content.startswith("!volunteer"):
         log.debug("[{0}] Role addition requested".format(message.author))
 
         member = server.get_member_named(str(message.author))
@@ -109,7 +110,7 @@ async def on_message(message):
             await client.send_message(channels['on_hand_volunteers'], notification_msg.format(user=member.mention, volunteers=len(get_volunteers())))
 
     # Remove user from the volunteers role
-    elif message.content == "!unvolunteer":
+    elif message.content.startswith("!unvolunteer"):
         log.debug("[{0}] Role removal requested".format(message.author))
 
         member = server.get_member_named(str(message.author))
@@ -137,7 +138,7 @@ async def on_message(message):
             log.debug("[{0}] Role was already not assigned".format(member))
 
     # List the volunteers that are online
-    elif message.content == "!volunteers":
+    elif message.content.startswith("!volunteers"):
         log.debug("[{0}] Requested information about volunteers".format(message.author))
         volunteers = get_volunteers()
         volunteers_msg = "There are currently {0} volunteers available.\n\n".format(len(volunteers))
@@ -181,7 +182,7 @@ async def on_message(message):
             await client.send_message(message.channel, msg)
 
     # Show a help/about dialog
-    elif message.content in ("!about", "!commands"):
+    elif message.content.startswith("!about") or message.content.startswith("!commands"):
         log.debug("[{0}] Requested information about us".format(message.author))
         msg = "I'm the friendly bot for managing various automatic rules and features of the Dallas Makerspace Discord chat server.\n\n" \
               "I understand the following commands:\n\n" \
@@ -191,11 +192,38 @@ async def on_message(message):
               "`!unvoluntter` - Remove yourself from the list of active volunteers and stop receiving notifcations.\n" \
               "`!volunteers` - List the active volunteers.\n" \
               "`!members` - Show the total number of active DMS members.\n" \
+              "`!8ball` - Ask the magic 8 ball a question.\n" \
               "\nIf I'm not working correctly or you'd like to help improve me, please join the {infrastructure} channel.\n\n" \
               "My source code is available at: https://github.com/Dallas-Makerspace/dms-discord-bot." \
               .format(on_hand_volunteers=channels['on_hand_volunteers'].mention, infrastructure=channels['infrastructure'].mention)
         await client.send_message(message.channel, msg)
     elif message.content.startswith("!voluntell"):
         await client.send_message(message.channel, "{user} do it yourself".format(user=message.author.mention))
+    elif message.content.startswith("!howdoilook"):
+        await client.send_message(message.channel, "{user}, that outfit makes your butt look big".format(user=message.author.mention))
+    elif message.content.startswith("!8ball"):
+        phrases = [
+            "As I see it, yes",
+            "Ask again later",
+            "Better not tell you now",
+            "Cannot predict now",
+            "Concentrate and ask again",
+            "Don’t count on it",
+            "It is certain",
+            "It is decidedly so",
+            "Most likely",
+            "My reply is no",
+            "My sources say no",
+            "Outlook good",
+            "Outlook not so good",
+            "Reply hazy, try again",
+            "Signs point to yes",
+            "Very doubtful",
+            "Without a doubt",
+            "Yes",
+            "Yes, definitely",
+            "You may rely on it."
+        ]
+        await client.send_message(message.channel, "{user}: {phrase}".format(user=message.author.mention, phrase=random.choice(phrases)))
 
 client.run(args.token)
