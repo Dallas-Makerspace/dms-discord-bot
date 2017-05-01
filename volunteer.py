@@ -193,6 +193,7 @@ async def on_message(message):
               "`!volunteers` - List the active volunteers.\n" \
               "`!members` - Show the total number of active DMS members.\n" \
               "`!8ball` - Ask the magic 8 ball a question.\n" \
+              "`!random` - Request a random number, chosen by fair dice roll.\n" \
               "\nIf I'm not working correctly or you'd like to help improve me, please join the {infrastructure} channel.\n\n" \
               "My source code is available at: https://github.com/Dallas-Makerspace/dms-discord-bot." \
               .format(on_hand_volunteers=channels['on_hand_volunteers'].mention, infrastructure=channels['infrastructure'].mention)
