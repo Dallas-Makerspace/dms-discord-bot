@@ -4,7 +4,7 @@ import logging as log
 import sys
 import discord
 import asyncio
-import urllib.request
+import urllib
 import json
 import random
 
@@ -250,5 +250,18 @@ async def on_message(message):
             "Blame Pearce"
         ]
         await client.send_message(message.channel, "{user}: {phrase}".format(user=message.author.mention, phrase=random.choice(phrases)))
+
+    # Let me google that for you
+    elif message.content.startswith("!google"):
+        message_parts = message.content.split(' ', 1)
+
+        if len(message_parts) == 1:
+            return
+
+        help_msg = "{user}, here's the info: http://lmgtfy.com/?q={query}".format(
+            user=message.author.mention,
+            query=urllib.parse.quote(message_parts[1])
+        )
+        await client.send_message(message.channel, help_msg)
 
 client.run(args.token)
