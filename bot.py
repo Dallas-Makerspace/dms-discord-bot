@@ -212,8 +212,17 @@ async def on_message(message):
     elif message.content.startswith("!random"):
         await client.send_message(message.channel, "{user}, 4".format(user=message.author.mention))
 
+    # Automatically fix tables
     elif "(╯°□°）╯︵ ┻━┻" in message.content:
         await client.send_message(message.channel, "┬──┬ ﾉ(° -°ﾉ)\n{user} that wasn't nice.".format(user=message.author.mention))
+
+    # #yeah
+    elif message.content.startswith("!yeah"):
+        await client.send_message(message.channel, "( •\_•)\n( •\_•)>⌐■-■\n(⌐■\_■)")
+
+    # ¯\_(ツ)_/¯
+    elif message.content.startswith("!shrug"):
+        await client.send_message(message.channel, "¯\\_(ツ)_/¯")
 
     # Magic 8 Ball
     elif message.content.startswith("!8ball"):
