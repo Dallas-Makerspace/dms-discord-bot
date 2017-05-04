@@ -4,7 +4,8 @@ import logging as log
 import sys
 import discord
 import asyncio
-import urllib
+import requests
+import urllib.parse
 import json
 import random
 
@@ -176,10 +177,10 @@ async def on_message(message):
     # Request number of members
     elif message.content.startswith("!members"):
         log.debug("[{0}] Requested number of members".format(message.author))
-        with urllib.request.urlopen("https://accounts.dallasmakerspace.org/member_count.php") as url:
-            data = json.loads(url.read().decode())
-            msg = "There are currently {total} members.".format(total=data['total'])
-            await client.send_message(message.channel, msg)
+        response = requests.get("https://accounts.dallasmakerspace.org/member_count.php")
+        data = response.json()
+        msg = "There are currently {total} members.".format(total=data['total'])
+        await client.send_message(message.channel, msg)
 
     # Show a help/about dialog
     elif message.content.startswith("!about") or message.content.startswith("!commands"):
@@ -260,7 +261,7 @@ async def on_message(message):
 
         help_msg = "{user}, here's the info: http://lmgtfy.com/?q={query}".format(
             user=message.author.mention,
-            query=urllib.parse.quote(message_parts[1])
+            query=urllib.parse.quote_plus(message_parts[1])
         )
         await client.send_message(message.channel, help_msg)
 
