@@ -1,4 +1,4 @@
-#!/usr/bin/python3.7 -u
+#!/usr/bin/python3.6 -u
 import io
 import typing
 import asyncio
