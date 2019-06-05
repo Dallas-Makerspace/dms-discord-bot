@@ -1,268 +1,210 @@
-#!/usr/bin/python3
-import argparse
-import logging as log
-import sys
-import discord
+#!/usr/bin/python3.7 -u
+import io
+import typing
 import asyncio
-import requests
-import urllib.parse
-import json
-import random
+import aiohttp
+from functions import *
+from discord.ext import commands
+from datetime import datetime
 
-parser = argparse.ArgumentParser(description="Handle the #on_hand_volunteers channel.")
-parser.add_argument("-v", "--verbose", dest="verbose", action="store_const",
-                    const=True, default=False,
-                    help="verbose output")
-parser.add_argument("-q", "--quiet", dest="quiet", action="store_const",
-                    const=True, default=False,
-                    help="only output warnings and errors")
-parser.add_argument("token", metavar="token", action="store",
-                    help="discord auth token for the bot")
-args = parser.parse_args()
+bot = commands.Bot(command_prefix="!", case_insensitive=True, help_command=None)
 
-if args.verbose:
-    log.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s", level=log.DEBUG, stream=sys.stdout)
-    log.debug("Verbose output enabled")
-elif args.quiet:
-    log.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s", level=log.WARNING, stream=sys.stdout)
-else:
-    log.basicConfig(format="[%(asctime)s] [%(levelname)s] %(message)s", level=log.INFO, stream=sys.stdout)
+def get_command_help(command):
+    help = f"`{bot.command_prefix}{command.name} "
+    for alias in sorted(command.aliases):
+        help = help + f"or {bot.command_prefix}{alias} "
+    if command.signature != "":
+        help = help + f"{command.signature} "
+    help = help + f"` - {command.help}"
+    return help
 
-log.info("Started")
+def has_role(member, role_name):
+    for role in member.roles:
+        if role.name.lower() == role_name.lower():
+            return True
+    return False
 
-client = discord.Client()
+def get_guild():
+    guild_id = config["discord"]["guild_id"]
+    return bot.get_guild(guild_id)
 
-def get_channel(requested_channel):
-    for channel in server.channels:
-        if channel.name == requested_channel:
-            return(channel)
-    else:
-        log.error("The #{0} channel does not exist".format(requested_channel))
-        sys.exit(1)
+def get_channel(name):
+    for channel in get_guild().channels:
+        if channel.name == name:
+            return channel
+    return None
 
-def get_role(requested_role):
-    for role in server.roles:
-        if role.name == requested_role:
-            return(role)
-    else:
-        log.error("The {0} role does not exist".format(requested_role))
-        sys.exit(1)
+def get_category(name):
+    for category in get_guild().categories:
+        if category.name.lower() == name.lower():
+            return category
+    return None
 
-def get_volunteers():
-    volunteers = []
-    for member in server.members:
-        for member_role in member.roles:
-            if member_role.name == "volunteers":
-                volunteers.append(member)
-                break
-    return(volunteers)
+def get_channel_by_topic(topic):
+    for channel in get_guild().text_channels:
+        if channel.topic == topic:
+            return channel
+    return None
 
-@client.event
+def get_role(name):
+    for role in get_guild().roles:
+        if role.name.lower() == name.lower():
+            return role
+    return None
+
+def get_members_by_role(name):
+    return get_role(name).members
+
+@asyncio.coroutine
+async def monitor_deletions():
+    guild = get_guild()
+    waifu_audit_log = {}
+    action = discord.AuditLogAction.message_delete
+    async for entry in guild.audit_logs(action=action, limit=25):
+        if entry.id not in waifu_audit_log:
+            if seconds_since(entry.created_at) < 3600:
+                waifu_audit_log[entry.id] = entry
+    while True:
+        message = await bot.wait_for("message_delete")
+        deleted_by = message.author
+        author = message.author
+        async for entry in guild.audit_logs(action=action, limit=5):
+            if entry.extra.channel == message.channel:
+                if entry.id not in waifu_audit_log:
+                    if seconds_since(entry.created_at) < 60:
+                        waifu_audit_log[entry.id] = entry
+                        deleted_by = entry.user
+                elif waifu_audit_log[entry.id].extra.count != entry.extra.count:
+                    waifu_audit_log[entry.id] = entry
+                    deleted_by = entry.user
+                else:
+                    if seconds_since(waifu_audit_log[entry.id].created_at) > 86400:
+                        del waifu_audit_log[entry.id]
+        if author == bot.user and deleted_by == bot.user:
+            continue
+        timestamp = message.created_at.strftime("%m/%d/%Y %H:%M")
+        title = f"ID: {message.id}"
+        description = f"Author: {author.mention}\nDeleted by: {deleted_by.mention}*\nChannel: {message.channel.mention}\nUTC: {timestamp}"
+        embed = discord.Embed(title=title, description=description, color=discord.Color.red())
+        deleted_embeds = message.embeds
+        if len(message.content) > 0:
+            value = f"\"{message.content}\""
+            embed.add_field(name="Message", value=value, inline=False)
+        if len(message.attachments) > 0:
+            name = "Attachments"
+            value = ""
+            for attachment in message.attachments:
+                value = value + "<{}>\n".format(attachment.proxy_url)
+            embed.add_field(name=name, value=value, inline=False)
+        if len(message.embeds) > 0:
+            name = "Embeds"
+            value = f"{len(message.embeds)} found. See below:"
+            embed.add_field(name=name, value=value, inline=False)
+        channel = get_channel("deleted_text")
+        await channel.send(embed=embed)
+        for index, embed in enumerate(deleted_embeds):
+            embed.color = waifu_pink
+            reply = f"**Embed {index + 1} of {len(deleted_embeds)}**"
+            await channel.send(reply, embed=embed)
+
+@bot.event
 async def on_ready():
-    global server
-    global channels
-    global roles
+    log.info(f"Logged on as {bot.user}")
+    loop = asyncio.get_event_loop()
+    monitor_deletions_task = loop.create_task(monitor_deletions())
 
-    log.info("Connected to discord")
-    log.debug("Logged in as:")
-    log.debug("User: {0}".format(client.user.name))
-    log.debug("ID: {0}".format(client.user.id))
+@bot.event
+async def on_command_error(ctx, error):
+    error_text = str(error)
+    if isinstance(error, commands.UserInputError):
+        if error_text != "":
+            if error_text[-1] != ".":
+                error_text = error_text + "."
+        error_text = sentence_case(error_text)
+        error_text = error_text + "\n" + get_command_help(ctx.command)
+        reply = f"ERROR: {ctx.author.mention}, invalid syntax.\n{error_text}"
+        await ctx.send(reply)
+    elif isinstance(error, commands.MissingRole):
+        reply = f"ERROR: {ctx.author.mention}, missing role."
+        await ctx.send(reply)
+    elif isinstance(error, commands.NoPrivateMessage):
+        reply = f"ERROR: {ctx.author.mention}, bad channel."
+        await ctx.send(reply)
+    elif isinstance(error, commands.errors.CommandNotFound):
+        reply = f"ERROR: {ctx.author.mention}, invalid command. Maybe try `!about`."
+        await ctx.send(reply)
+    elif isinstance(error, commands.errors.CommandInvokeError):
+        raise error.original
+    log_msg = f"[{ctx.author}] - [{ctx.channel}]\n[{error.__class__}]\n{ctx.message.content}"
+    log.error(log_msg)
+    return
 
-    # Hardcoded server ID for Dallas Makerspace
-    server = client.get_server("300062029559889931")
-    channels = dict()
-    roles = dict()
+@bot.command(aliases=["info"])
+@commands.guild_only()
+async def about(ctx):
+    """Display this help message."""
+    reply = "I understand the following commands:\n\n"
+    for command in sorted(bot.commands, key=lambda x: x.name):
+        if not command.hidden:
+            reply = reply + get_command_help(command) + "\n"
+    reply = reply + "\nMy source code is available on GitHub: https://github.com/Dallas-Makerspace/dms-discord-bot"
+    await ctx.send(reply)
 
-    # Pre-load channels and roles so we don't have to look them up each time
-    # Grab the info for the #on_hand_volunteers channel
-    channels['on_hand_volunteers'] = get_channel("on_hand_volunteers")
-    channels['infrastructure'] = get_channel("infrastructure")
-    # Grab the info for the volunteers role
-    roles['volunteers'] = get_role("volunteers")
+@bot.command()
+@commands.guild_only()
+async def members(ctx):
+    """Show the total number of active DMS members."""
+    async with aiohttp.ClientSession() as session:
+        async with session.get('https://accounts.dallasmakerspace.org/member_count.php') as resp:
+            if resp.status != 200:
+                reply = f"Error {resp.status}: I cannot access that info right now."
+                await ctx.send(reply)
+                return
+            total = (await resp.json(content_type='text/html'))['total']
+            reply = f"There are currently {total} members."
+            await ctx.send(reply)
+    return
 
-@client.event
-async def on_message(message):
-    # Add user to the volunteers role
-    if message.content.startswith("!volunteer"):
-        log.debug("[{0}] Role addition requested".format(message.author))
+@bot.command()
+@commands.guild_only()
+async def magic8ball(ctx, question: str):
+    """Ask the magic 8 ball a question."""
+    answer = random.choice(strings['eight_ball'])
+    reply = f"{ctx.author.mention}, the magic 8 ball has spoken: \"{answer}\"."
+    await ctx.send(reply)
+    return
 
-        member = server.get_member_named(str(message.author))
-
-        if not member:
-            await client.send_message(message.author, "You are not a member of the Dallas Makerspace discord server")
+@bot.command(name="random")
+@commands.guild_only()
+async def _random(ctx):
+    """Request a random number, chosen by fair dice roll."""
+    await ctx.send(f"{ctx.author.mention}: 4")
+    def check(answer):
+        if answer.channel == ctx.channel:
+            is_not = ["n't", "not", "no", "crypto"]
+            for word in is_not:
+                if (word in answer.content.lower() and "random" in answer.content.lower()) or answer.content.lower().startswith("!random"):
+                    return True
+        return False
+    try:
+        answer = await bot.wait_for("message", timeout=300, check=check)
+        if answer.content.lower().startswith("!random"):
             return
+        reply = f"{answer.author.mention}, I disagree:\nhttps://xkcd.com/221/"
+        await ctx.send(reply)
+        return
+    except asyncio.TimeoutError:
+        return
 
-        # Check to see if the user already has this role
-        for author_role in member.roles:
-            if author_role.name == "volunteers":
-                # They did, let them know they already had it
-                msg = "{user} you already have access to the {channel} channel."
-                await client.send_message(member, msg.format(user=member.mention, channel=channels['on_hand_volunteers'].mention))
-                log.debug("[{0}] Role already assigned".format(member))
-                break
-        else:
-            # They didn't have the role, so add it
-            await client.add_roles(member, roles['volunteers'])
-            log.info("[{0}] Role added".format(member))
-            reply = "Hello {user}, you are now able to post in the {channel} channel. You can use `!unvolunteer` to be removed from the channel at anytime."
-            await client.send_message(member, reply.format(user=member.mention, channel=channels['on_hand_volunteers'].mention))
+@bot.command(hidden=True)
+@commands.has_role("nerds")
+@commands.guild_only()
+async def die(ctx):
+    """Kill my currently running instance. I won't forget this."""
+    reply = random.choice(strings['last_words'])
+    await ctx.send(reply)
+    exit(0)
+    return
 
-            notification_msg = "{user} is now listed as an on hand volunteer and is available to help. There are currently {volunteers} volunteers available."
-            await client.send_message(channels['on_hand_volunteers'], notification_msg.format(user=member.mention, volunteers=len(get_volunteers())))
-
-    # Remove user from the volunteers role
-    elif message.content.startswith("!unvolunteer"):
-        log.debug("[{0}] Role removal requested".format(message.author))
-
-        member = server.get_member_named(str(message.author))
-
-        if not member:
-            await client.send_message(message.author, "You are not a member of the Dallas Makerspace discord server")
-            return
-
-        # Check to see if the user has this role
-        for author_role in member.roles:
-            if author_role.name == "volunteers":
-                # They did, so remove the role
-                await client.remove_roles(member, author_role)
-                log.info("[{0}] Role removed".format(member))
-                msg = "Hello {user}, you have been removed from the {channel} channel, to re-join send `!volunteer` in any channel."
-                await client.send_message(member, msg.format(user=member.mention, channel=channels['on_hand_volunteers'].mention))
-
-                notification_msg = "{user} has left volunteer status. There are currently {volunteers} volunteers available."
-                await client.send_message(channels['on_hand_volunteers'], notification_msg.format(user=member.mention, volunteers=len(get_volunteers())))
-                break
-        else:
-            # They didn't have the role, do nothing
-            msg = "{user}, you have already unsubscribed from the {channel} channel"
-            await client.send_message(member, msg.format(user=member.mention, channel=channels['on_hand_volunteers'].mention))
-            log.debug("[{0}] Role was already not assigned".format(member))
-
-    # List the volunteers that are online
-    elif message.content.startswith("!volunteers"):
-        log.debug("[{0}] Requested information about volunteers".format(message.author))
-        volunteers = get_volunteers()
-        volunteers_msg = "There are currently {0} volunteers available.\n\n".format(len(volunteers))
-        for volunteer in volunteers:
-            volunteers_msg += ("@{0}\n".format(volunteer.name))
-        await client.send_message(message.channel, volunteers_msg)
-
-    # Request help from a volunteer
-    elif message.content.startswith("!help"):
-        log.debug("[{0}] Requested help from volunteers".format(message.author))
-
-        if message.channel.is_private:
-            request_method = "Private Message"
-        else:
-            request_method = message.channel.mention
-
-        message_parts = message.content.split(' ', 1)
-
-        if len(message_parts) == 1:
-            log.info("[{0}] No message specified in help request".format(message.author))
-            msg = "You must specify a message with your help request"
-            await client.send_message(message.author, msg)
-            return
-
-        # Build the message for #on_hand_volunteers
-        help_msg = "Eyes up, {volunteers}! {user} in {channel} needs help: {request}".format(
-            volunteers=roles['volunteers'].mention,
-            user=message.author.mention,
-            channel=request_method,
-            # Remove "!help " from the message
-            request=message_parts[1]
-        )
-        await client.send_message(channels['on_hand_volunteers'], help_msg)
-
-    # Request number of members
-    elif message.content.startswith("!members"):
-        log.debug("[{0}] Requested number of members".format(message.author))
-        response = requests.get("https://accounts.dallasmakerspace.org/member_count.php")
-        data = response.json()
-        msg = "There are currently {total} members.".format(total=data['total'])
-        await client.send_message(message.channel, msg)
-
-    # Show a help/about dialog
-    elif message.content.startswith("!about") or message.content.startswith("!commands"):
-        log.debug("[{0}] Requested information about us".format(message.author))
-        msg = "I'm the friendly bot for managing various automatic rules and features of the Dallas Makerspace Discord chat server.\n\n" \
-              "I understand the following commands:\n\n" \
-              "`!about` or `!commands` - This about message.\n" \
-              "`!help` - Request help from volunteers, for example `!help I can't access the fileserver` will send a request to the active volunteers.\n" \
-              "`!volunteer` - Add yourself to the list of active volunteers, gain access to post in the {on_hand_volunteers} channel.\n" \
-              "`!unvoluntter` - Remove yourself from the list of active volunteers and stop receiving notifcations.\n" \
-              "`!volunteers` - List the active volunteers.\n" \
-              "`!members` - Show the total number of active DMS members.\n" \
-              "`!8ball` - Ask the magic 8 ball a question.\n" \
-              "`!random` - Request a random number, chosen by fair dice roll.\n" \
-              "\nIf I'm not working correctly or you'd like to help improve me, please join the {infrastructure} channel.\n\n" \
-              "My source code is available at: https://github.com/Dallas-Makerspace/dms-discord-bot." \
-              .format(on_hand_volunteers=channels['on_hand_volunteers'].mention, infrastructure=channels['infrastructure'].mention)
-        await client.send_message(message.channel, msg)
-
-    # When you really need someone to _volunteer_ for something, you voluntell them
-    elif message.content.startswith("!voluntell"):
-        await client.send_message(message.channel, "{user} do it yourself. If you need help with something, ask politely using the `!help` command".format(user=message.author.mention))
-
-    # This command is inadvisable
-    elif message.content.startswith("!howdoilook"):
-        await client.send_message(message.channel, "{user}, that outfit makes your butt look big".format(user=message.author.mention))
-
-    # RFC 1149.5 specifies 4 as the standard IEEE-vetted random number.
-    # https://xkcd.com/221/
-    elif message.content.startswith("!random"):
-        await client.send_message(message.channel, "{user}, 4".format(user=message.author.mention))
-
-    # Automatically fix tables
-    elif "(╯°□°）╯︵ ┻━┻" in message.content:
-        await client.send_message(message.channel, "┬──┬ ﾉ(° -°ﾉ)\n{user} that wasn't nice.".format(user=message.author.mention))
-
-    # #yeah
-    elif message.content.startswith("!yeah"):
-        await client.send_message(message.channel, "( •\_•)\n( •\_•)>⌐■-■\n(⌐■\_■)")
-
-    # ¯\_(ツ)_/¯
-    elif message.content.startswith("!shrug"):
-        await client.send_message(message.channel, "¯\\_(ツ)_/¯")
-
-    # Magic 8 Ball
-    elif message.content.startswith("!8ball"):
-        phrases = [
-            "As I see it, yes",
-            "Ask again later",
-            "Better not tell you now",
-            "Cannot predict now",
-            "Concentrate and ask again",
-            "Don’t count on it",
-            "It is certain",
-            "It is decidedly so",
-            "Most likely",
-            "My reply is no",
-            "My sources say no",
-            "Outlook good",
-            "Outlook not so good",
-            "Reply hazy, try again",
-            "Signs point to yes",
-            "Very doubtful",
-            "Without a doubt",
-            "Yes",
-            "Yes, definitely",
-            "You may rely on it.",
-            "Blame Pearce"
-        ]
-        await client.send_message(message.channel, "{user}: {phrase}".format(user=message.author.mention, phrase=random.choice(phrases)))
-
-    # Let me google that for you
-    elif message.content.startswith("!google"):
-        message_parts = message.content.split(' ', 1)
-
-        if len(message_parts) == 1:
-            return
-
-        help_msg = "{user}, here's the info: http://lmgtfy.com/?q={query}".format(
-            user=message.author.mention,
-            query=urllib.parse.quote_plus(message_parts[1])
-        )
-        await client.send_message(message.channel, help_msg)
-
-client.run(args.token)
+token = config["discord"]["token"]
+bot.run(token)

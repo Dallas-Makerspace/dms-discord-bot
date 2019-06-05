@@ -1,0 +1,10 @@
+discord:
+    token:
+    guild_id: 300062029559889931
+roles:
+    forbidden:
+        - nerds
+        - bots
+        - "board members"
+        - "committee chairs"
+        - "@everyone"
