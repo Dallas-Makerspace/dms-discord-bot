@@ -6,6 +6,7 @@ import aiohttp
 from functions import *
 from discord.ext import commands
 from datetime import datetime
+from history import get_wiki_history
 
 bot = commands.Bot(command_prefix="!", case_insensitive=True, help_command=None)
 
@@ -162,7 +163,19 @@ async def members(ctx):
                 return
             total = (await resp.json(content_type='text/html'))['total']
             reply = f"There are currently {total} members."
-            await ctx.send(reply)
+            embed = None
+            try:
+                
+                hist = get_wiki_history(total)
+                embed = discord.Embed(
+                    color = 3447003,
+                    description = hist,
+                    title = 'Mitch History',
+                    url = 'https://en.wikipedia.org/wiki/' + str(total) + "#Events") 
+            except:
+                pass
+
+            await ctx.send(content = reply, embed = embed)
     return
 
 @bot.command()
