@@ -5,9 +5,12 @@ import asyncio
 import aiohttp
 from functions import *
 from discord.ext import commands
+"""Unsure if we should import * here"""
 from datetime import datetime
+from datetime import timedelta
 
 bot = commands.Bot(command_prefix="!", case_insensitive=True, help_command=None)
+last_members_request = datetime.utcnow() 
 
 def get_command_help(command):
     help = f"`{bot.command_prefix}{command.name} "
@@ -153,16 +156,23 @@ async def about(ctx):
 @bot.command()
 @commands.guild_only()
 async def members(ctx):
+    """/slap people if !members has already been polled recently"""
+    reply = ""
+    if (datetime.utcnow() - last_members_request) > timedelta(hours=6):
+        reply = reply + "That's already been asked\n"
+        reply = reply + f"slaps {ctx.author.mention} around a bit with a large trout"
+    """Let them see the count anyways"""
     """Show the total number of active DMS members."""
     async with aiohttp.ClientSession() as session:
         async with session.get('https://accounts.dallasmakerspace.org/member_count.php') as resp:
             if resp.status != 200:
-                reply = f"Error {resp.status}: I cannot access that info right now."
+                reply = reply + f"Error {resp.status}: I cannot access that info right now."
                 await ctx.send(reply)
                 return
             total = (await resp.json(content_type='text/html'))['total']
-            reply = f"There are currently {total} members."
+            reply = reply + f"There are currently {total} members."
             await ctx.send(reply)
+    last_members_request = datetime.utcnow()
     return
 
 @bot.command()
