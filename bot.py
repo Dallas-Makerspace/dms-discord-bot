@@ -10,7 +10,6 @@ from datetime import datetime
 from datetime import timedelta
 
 bot = commands.Bot(command_prefix="!", case_insensitive=True, help_command=None)
-last_members_request = datetime.utcnow() 
 
 def get_command_help(command):
     help = f"`{bot.command_prefix}{command.name} "
@@ -156,11 +155,14 @@ async def about(ctx):
 @bot.command()
 @commands.guild_only()
 async def members(ctx):
+    """Handle the inital case where last_members_request does not yet exist"""
+    if not hasattr(members, 'last_members_request'):
+        members.last_members_request = datetime(2000, 1, 1)
     """/slap people if !members has already been polled recently"""
     reply = ""
-    if (datetime.utcnow() - last_members_request) > timedelta(hours=6):
+    if (datetime.utcnow() - members.last_members_request) < timedelta(hours=6):
         reply = reply + "That's already been asked\n"
-        reply = reply + f"slaps {ctx.author.mention} around a bit with a large trout"
+        reply = reply + f"slaps {ctx.author.mention} around a bit with a large trout\n"
     """Let them see the count anyways"""
     """Show the total number of active DMS members."""
     async with aiohttp.ClientSession() as session:
@@ -172,7 +174,7 @@ async def members(ctx):
             total = (await resp.json(content_type='text/html'))['total']
             reply = reply + f"There are currently {total} members."
             await ctx.send(reply)
-    last_members_request = datetime.utcnow()
+    members.last_members_request = datetime.utcnow()
     return
 
 @bot.command()
